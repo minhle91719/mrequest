@@ -96,7 +96,6 @@ func (r *RQ) Request(f func() (*http.Request, error)) ([]byte, error) {
 			return nil, err
 		}
 		content, err := ioutil.ReadAll(contentIO)
-		contentIO = ioutil.NopCloser(bytes.NewBuffer(content))
 		req.Header.Add("Content-Length", fmt.Sprintf("%d", len(string(content))))
 	}
 	req.Header.Add("Accept", "*/*")
