@@ -1,7 +1,6 @@
 package mrequest
 
 import (
-	"bytes"
 	"compress/gzip"
 	"context"
 	"fmt"
@@ -39,6 +38,9 @@ const (
 func NewRequest(host string, client *http.Client, rps int) IRequest {
 	if rps == 0 {
 		rps = DefaultMaxRequestPerSecond
+	}
+	if client == nil {
+		client = http.DefaultClient
 	}
 	rq := &RQ{
 		_host:         host,
@@ -92,6 +94,7 @@ func (r *RQ) Request(f func() (*http.Request, error)) ([]byte, error) {
 	switch req.Method {
 	case http.MethodPost:
 		contentIO, err := req.GetBody()
+		// req.GetBody return copy of body, dont use ioutil.NopCloser
 		if err != nil {
 			return nil, err
 		}
