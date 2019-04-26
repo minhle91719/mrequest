@@ -41,6 +41,7 @@ func NewRequest(host string, client *http.Client, rps int) IRequest {
 	}
 	if client == nil {
 		client = http.DefaultClient
+		client.Timeout = 5 * time.Second
 	}
 	rq := &RQ{
 		_host:         host,
