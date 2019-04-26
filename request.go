@@ -52,6 +52,9 @@ func NewRequest(host string, client *http.Client, rps int) IRequest {
 		client:        client,
 	}
 	rq.ctx, rq.cancel = context.WithCancel(context.Background())
+	for i:= 0 ; i < rps;i++ {
+		rq.requestAccess <- 1
+	}
 	go rq.grantRequest(rps)
 	return rq
 }
