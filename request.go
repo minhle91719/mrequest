@@ -94,7 +94,9 @@ func (r *RQ) Request(f func() (*http.Request, error)) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Add("User-Agent", r.ua)
+	if req.Header.Get("User-Agent") == "" {
+		req.Header.Add("User-Agent", r.ua)
+	}
 	switch req.Method {
 	case http.MethodPost:
 		contentIO, err := req.GetBody()
