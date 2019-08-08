@@ -7,11 +7,13 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	
+	"golang.org/x/time/rate"
 	"time"
 )
 
-const (
-	DefaultMaxRequestPerSecond = 1
+var (
+	defaultLimiter = rate.NewLimiter(rate.Every(5*time.Second), 1)
 )
 
 type RQ struct {
@@ -20,9 +22,9 @@ type RQ struct {
 	_ref       string
 	ua         string
 	client     *http.Client
-
-	requestAccess chan int
-
+	
+	limiter *rate.Limiter
+	
 	ctx    context.Context
 	cancel context.CancelFunc
 }
@@ -35,27 +37,23 @@ const (
 	TextJSType contentType = "text/javascript"
 )
 
-func NewRequest(host string, client *http.Client, rps int) IRequest {
-	if rps == 0 {
-		rps = DefaultMaxRequestPerSecond
+func NewRequest(host string, client *http.Client, limiter *rate.Limiter) IRequest {
+	if limiter == nil {
+		limiter = defaultLimiter
 	}
 	if client == nil {
 		client = http.DefaultClient
 		client.Timeout = 5 * time.Second
 	}
 	rq := &RQ{
-		_host:         host,
-		_mapCookie:    make(map[string]http.Cookie),
-		_ref:          host,
-		ua:            randomUA(),
-		requestAccess: make(chan int, rps),
-		client:        client,
+		_host:      host,
+		_mapCookie: make(map[string]http.Cookie),
+		_ref:       host,
+		ua:         randomUA(),
+		limiter:    limiter,
+		client:     client,
 	}
 	rq.ctx, rq.cancel = context.WithCancel(context.Background())
-	for i:= 0 ; i < rps;i++ {
-		rq.requestAccess <- 1
-	}
-	go rq.grantRequest(rps)
 	return rq
 }
 
@@ -64,30 +62,19 @@ type IRequest interface {
 	Close()
 }
 
-func (r *RQ) grantRequest(maxRequestPerSecond int) {
-	ticker := time.NewTicker(1 * time.Second)
-	for range ticker.C {
-		select {
-		case <-r.ctx.Done():
-			return
-		default:
-			for len(r.requestAccess) < maxRequestPerSecond {
-				r.requestAccess <- 1
-			}
-		}
-	}
-}
 func (r *RQ) Close() {
 	r.cancel()
 }
 func (r *RQ) Request(f func() (*http.Request, error)) ([]byte, error) {
-	<-r.requestAccess
+	for !r.limiter.Allow() {
+		time.Sleep(10 * time.Millisecond)
+	}
 	var (
 		req *http.Request
 		res *http.Response
-
+		
 		reader io.ReadCloser
-
+		
 		err error
 	)
 	req, err = f()
@@ -115,6 +102,7 @@ func (r *RQ) Request(f func() (*http.Request, error)) ([]byte, error) {
 		ck := http.Cookie{}
 		ck = v
 		req.AddCookie(&ck)
+		//fmt.Println(v)
 	}
 	if res, err = r.client.Do(req); err != nil {
 		return nil, err
