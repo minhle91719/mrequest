@@ -15,7 +15,7 @@ import (
 var (
 	defaultLimiter = rate.NewLimiter(rate.Every(5*time.Second), 1)
 )
-
+// TODO: add request file return io.ReadSeeker
 type RQ struct {
 	_host      string
 	_mapCookie map[string]http.Cookie
@@ -25,8 +25,7 @@ type RQ struct {
 	
 	limiter *rate.Limiter
 	
-	ctx    context.Context
-	cancel context.CancelFunc
+	ctx context.Context
 }
 
 type contentType string
@@ -37,7 +36,7 @@ const (
 	TextJSType contentType = "text/javascript"
 )
 
-func NewRequest(host string, client *http.Client, limiter *rate.Limiter) IRequest {
+func NewRequest(ctx context.Context, host string, client *http.Client, limiter *rate.Limiter) IRequest {
 	if limiter == nil {
 		limiter = defaultLimiter
 	}
@@ -52,23 +51,22 @@ func NewRequest(host string, client *http.Client, limiter *rate.Limiter) IReques
 		ua:         randomUA(),
 		limiter:    limiter,
 		client:     client,
+		ctx:        ctx,
 	}
-	rq.ctx, rq.cancel = context.WithCancel(context.Background())
 	return rq
 }
 
 type IRequest interface {
 	Request(f func() (*http.Request, error)) ([]byte, error)
-	Close()
 }
 
-func (r *RQ) Close() {
-	r.cancel()
-}
 func (r *RQ) Request(f func() (*http.Request, error)) ([]byte, error) {
 	for !r.limiter.Allow() {
-		time.Sleep(10 * time.Millisecond)
 	}
+	if _, ok := <-r.ctx.Done(); ok {
+		return nil, errors.New("context canceled")
+	}
+	
 	var (
 		req *http.Request
 		res *http.Response
