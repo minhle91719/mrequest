@@ -44,7 +44,7 @@ func NewRequest(ctx context.Context, host string, client *http.Client, limiter *
 	}
 	if client == nil {
 		client = http.DefaultClient
-		client.Timeout = 5 * time.Second
+		client.Timeout = 15 * time.Second
 	}
 	rq := &RQ{
 		_host:      host,
