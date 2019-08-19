@@ -26,8 +26,6 @@ type RQ struct {
 	client     *http.Client
 	
 	limiter *rate.Limiter
-	
-	ctx context.Context
 }
 
 type contentType string
@@ -38,7 +36,7 @@ const (
 	TextJSType contentType = "text/javascript"
 )
 
-func NewRequest(ctx context.Context, host string, client *http.Client, limiter *rate.Limiter) IRequest {
+func NewRequest(host string, client *http.Client, limiter *rate.Limiter) IRequest {
 	if limiter == nil {
 		limiter = defaultLimiter
 	}
@@ -53,22 +51,22 @@ func NewRequest(ctx context.Context, host string, client *http.Client, limiter *
 		ua:         randomUA(),
 		limiter:    limiter,
 		client:     client,
-		ctx:        ctx,
 	}
 	return rq
 }
 
 type IRequest interface {
-	Request(f func() (*http.Request, error)) ([]byte, error)
+	Request(ctx context.Context, f func() (*http.Request, error)) ([]byte, error)
+	GetFile(ctx context.Context, f func() (*http.Request, error)) (io.Reader, error)
 	ExportCookie() []*http.Cookie
 	AddCookie(list []*http.Cookie)
 }
 
-func (r *RQ) Request(f func() (*http.Request, error)) ([]byte, error) {
+func (r *RQ) Request(ctx context.Context, f func() (*http.Request, error)) ([]byte, error) {
 	for !r.limiter.Allow() {
 	}
 	select {
-	case <-r.ctx.Done():
+	case <-ctx.Done():
 		return nil, errors.New("context canceled")
 	default:
 	}
@@ -151,4 +149,19 @@ func (r *RQ) AddCookie(list []*http.Cookie) {
 	for _, v := range list {
 		r._mapCookie[v.Name] = *v
 	}
+}
+
+func (r *RQ) GetFile(ctx context.Context, f func() (*http.Request, error)) (body io.Reader, err error) {
+	var (
+		request  *http.Request
+		response *http.Response
+	)
+	
+	if request, err = f(); err != nil {
+		return nil, err
+	}
+	if response, err = r.client.Do(request); err != nil {
+		return nil, err
+	}
+	return response.Body, nil
 }
