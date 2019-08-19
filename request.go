@@ -57,7 +57,7 @@ func NewRequest(host string, client *http.Client, limiter *rate.Limiter) IReques
 
 type IRequest interface {
 	Request(ctx context.Context, f func() (*http.Request, error)) ([]byte, error)
-	GetFile(ctx context.Context, f func() (*http.Request, error)) (io.Reader, error)
+	GetFile(ctx context.Context, f func() (*http.Request, error)) (*http.Response, error)
 	ExportCookie() []*http.Cookie
 	AddCookie(list []*http.Cookie)
 }
@@ -151,10 +151,9 @@ func (r *RQ) AddCookie(list []*http.Cookie) {
 	}
 }
 
-func (r *RQ) GetFile(ctx context.Context, f func() (*http.Request, error)) (body io.Reader, err error) {
+func (r *RQ) GetFile(ctx context.Context, f func() (*http.Request, error)) (response *http.Response, err error) {
 	var (
-		request  *http.Request
-		response *http.Response
+		request *http.Request
 	)
 	
 	if request, err = f(); err != nil {
@@ -163,5 +162,5 @@ func (r *RQ) GetFile(ctx context.Context, f func() (*http.Request, error)) (body
 	if response, err = r.client.Do(request); err != nil {
 		return nil, err
 	}
-	return response.Body, nil
+	return response, nil
 }
