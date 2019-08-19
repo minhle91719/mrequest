@@ -4,11 +4,11 @@ import (
 	"compress/gzip"
 	"context"
 	"fmt"
+	"github.com/pkg/errors"
 	"io"
 	"io/ioutil"
 	"net/http"
 	
-	"errors"
 	"golang.org/x/time/rate"
 	"time"
 )
@@ -62,21 +62,15 @@ type IRequest interface {
 	AddCookie(list []*http.Cookie)
 }
 
-func (r *RQ) Request(ctx context.Context, f func() (*http.Request, error)) ([]byte, error) {
-	for !r.limiter.Allow() {
-	}
-	select {
-	case <-ctx.Done():
-		return nil, errors.New("context canceled")
-	default:
+func (r *RQ) Request(ctx context.Context, f func() (*http.Request, error)) (data []byte, err error) {
+	if err = r.grant(ctx); err != nil {
+		return nil, err
 	}
 	var (
 		req *http.Request
 		res *http.Response
 		
 		reader io.ReadCloser
-		
-		err error
 	)
 	req, err = f()
 	if err != nil {
@@ -152,15 +146,33 @@ func (r *RQ) AddCookie(list []*http.Cookie) {
 }
 
 func (r *RQ) GetFile(ctx context.Context, f func() (*http.Request, error)) (response *http.Response, err error) {
+	if err = r.grant(ctx); err != nil {
+		return nil, err
+	}
 	var (
 		request *http.Request
 	)
-	
 	if request, err = f(); err != nil {
 		return nil, err
+	}
+	for _, v := range r._mapCookie {
+		ck := http.Cookie{}
+		ck = v
+		request.AddCookie(&ck)
 	}
 	if response, err = r.client.Do(request); err != nil {
 		return nil, err
 	}
 	return response, nil
+}
+
+func (r *RQ) grant(ctx context.Context) (err error) {
+	for !r.limiter.Allow() {
+	}
+	select {
+	case <-ctx.Done():
+		return errors.New("context canceled")
+	default:
+	}
+	return nil
 }
