@@ -60,7 +60,7 @@ type IRequest interface {
 	Request(ctx context.Context, f func() (*http.Request, error)) ([]byte, error)
 	GetFile(ctx context.Context, f func() (*http.Request, error)) (*http.Response, error)
 	
-	OnRequest(f func(r *http.Request) (err error))
+	OnRequest(f func(r *http.Request) ( err error))
 	ExportCookie() []*http.Cookie
 	AddCookie(list []*http.Cookie)
 }
