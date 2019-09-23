@@ -23,9 +23,10 @@ type RQ struct {
 	_mapCookie map[string]http.Cookie
 	_ref       string
 	ua         string
-	client     *http.Client
 	
-	limiter *rate.Limiter
+	onRequest func(r *http.Request) (err error)
+	client    *http.Client
+	limiter   *rate.Limiter
 }
 
 type contentType string
@@ -58,8 +59,14 @@ func NewRequest(host string, client *http.Client, limiter *rate.Limiter) IReques
 type IRequest interface {
 	Request(ctx context.Context, f func() (*http.Request, error)) ([]byte, error)
 	GetFile(ctx context.Context, f func() (*http.Request, error)) (*http.Response, error)
+	
+	OnRequest(f func(r *http.Request) (err error))
 	ExportCookie() []*http.Cookie
 	AddCookie(list []*http.Cookie)
+}
+
+func (r *RQ) OnRequest(f func(r *http.Request) (err error)) {
+	r.onRequest = f
 }
 
 func (r *RQ) Request(ctx context.Context, f func() (*http.Request, error)) (data []byte, err error) {
@@ -75,6 +82,11 @@ func (r *RQ) Request(ctx context.Context, f func() (*http.Request, error)) (data
 	req, err = f()
 	if err != nil {
 		return nil, err
+	}
+	if r.onRequest != nil {
+		if err = r.onRequest(req); err != nil {
+			return nil, err
+		}
 	}
 	if req.Header.Get("User-Agent") == "" {
 		req.Header.Add("User-Agent", r.ua)
