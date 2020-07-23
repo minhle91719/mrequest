@@ -58,6 +58,12 @@ func (r *requestBuilder) AddHeader(m map[string]string) RequestBuilder {
 }
 
 func (r *requestBuilder) Build() (request *http.Request, err error) {
+	if r.method == "" {
+		return nil, errors.New("method missing")
+	}
+	if r._url == "" {
+		return nil, errors.New("method missing")
+	}
 	request, err = http.NewRequest(r.method, r._url, r.data)
 	if err != nil {
 		return request, errors.WithStack(err)
