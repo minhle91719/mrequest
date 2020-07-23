@@ -62,7 +62,7 @@ func (r *requestBuilder) Build() (request *http.Request, err error) {
 		return nil, errors.New("method missing")
 	}
 	if r._url == "" {
-		return nil, errors.New("method missing")
+		return nil, errors.New("url missing")
 	}
 	request, err = http.NewRequest(r.method, r._url, r.data)
 	if err != nil {
